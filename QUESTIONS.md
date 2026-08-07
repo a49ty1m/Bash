@@ -131,6 +131,17 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Write the standard header block for every script: shebang, description, usage, author, and version comment block.
 - [ ] Use `set -euo pipefail` at the top of every production script; explain what each option does and why `pipefail` catches pipeline failures that `-e` misses.
 
+### 1.12 Aliases
+
+- [ ] Define an alias with `alias ll='ls -lah --color=auto'`; verify it works interactively; explain why aliases defined in a script are local to that script's shell.
+- [ ] List all currently defined aliases with `alias` (no arguments); remove a specific alias with `unalias ll`; remove all aliases with `unalias -a`.
+- [ ] Add persistent aliases to `~/.bashrc`; reload it with `source ~/.bashrc`; explain the difference between putting aliases in `~/.bashrc` vs `~/.bash_aliases`.
+- [ ] Explain why aliases do **not** expand inside shell scripts by default; demonstrate that running a script with `bash script.sh` does not see aliases, while sourcing it with `. script.sh` does.
+- [ ] Enable alias expansion inside a script with `shopt -s expand_aliases`; explain when this is useful and when it is a design smell.
+- [ ] Create a safety alias `alias rm='rm -i'` that always prompts before deletion; explain the risk of scripts relying on interactive aliases.
+- [ ] Write a function instead of an alias when you need arguments (aliases cannot use `$1`); demonstrate the difference between `alias greet='echo Hello'` and `greet() { echo "Hello $1"; }`.
+- [ ] Use `type alias_name` to check whether a name is an alias, a function, a builtin, or an external command; use `which` and explain why it cannot see aliases.
+
 ---
 
 ## 2. Linux Command-Line Tools Deep Dive
@@ -326,6 +337,8 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Build a **service monitor**: loop every 60 seconds; check that a list of services (`nginx`, `postgresql`, `redis`) are active using `systemctl is-active`; restart any failed service and log the event.
 - [ ] Build a **package update automation script**: run `apt update`; collect the list of upgradable packages; log them; apply upgrades only if fewer than 20 packages are pending (to avoid large unreviewed updates); send results to a log file.
 - [ ] Build an **IOC extractor**: read a directory of text files; extract and deduplicate IPv4 addresses, domain names, MD5/SHA256 hashes, and URLs using `grep -oE` with appropriate patterns; output each category to a separate file.
+- [ ] Build a **firewall management script**: wrap `ufw` (or `iptables`) to accept arguments (`--allow port`, `--deny port`, `--status`, `--reset`); validate port numbers; log every rule change with a timestamp; require `--confirm` for destructive operations; run only on authorized systems you control.
+- [ ] Build a **batch vulnerability scanner**: accept a list of `host:port` pairs and a list of `nmap` scripts to run; run each scan sequentially or in parallel with a configurable concurrency limit; parse output to extract CVE identifiers; produce a deduplicated CSV report of `host,port,cve`.
 
 ---
 
@@ -415,6 +428,28 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Write a `pre-commit` hook that runs `shellcheck` on all staged `.sh` files and blocks the commit if any errors are found.
 - [ ] Use `git log --oneline --all` to review history; use `git diff HEAD~1` to see what changed in the last commit.
 - [ ] Write a commit message convention for scripts: `fix:`, `feat:`, `chore:`, `sec:` — explain why descriptive messages matter for script maintenance.
+
+### 7.6 Portable Shell Scripting
+
+- [ ] Change the shebang to `#!/bin/sh` and run the script with `dash script.sh`; fix every bashism that `dash` rejects: `[[`, `((...))`, `local`, `declare`, arrays, `&>`, `source` (use `.` instead).
+- [ ] Use `shellcheck --shell=sh script.sh` to lint for POSIX compliance; understand why SC2039 (bash-specific feature used in sh script) is raised.
+- [ ] Rewrite a `[[ ]]` test using POSIX `[ ]`: replace `[[ -z $VAR ]]` with `[ -z "$VAR" ]`; replace `[[ str =~ regex ]]` with `expr` or `grep`.
+- [ ] Rewrite a `for (( i=0; i<10; i++ ))` C-style loop using a POSIX `while` loop with `i=$((i+1))`.
+- [ ] Avoid `local` in sh by using subshells to scope variables: replace a function using `local var` with one that runs its body in `( )` instead.
+- [ ] Use `printf` instead of `echo` for portable output: explain why `echo -e`, `echo -n`, and `echo "\t"` behave differently across shells and why `printf` is consistent.
+- [ ] Explain when portability matters (scripts that must run on Alpine Linux with `busybox sh`, macOS `/bin/sh`, or minimal container images) and when it is fine to require Bash explicitly.
+- [ ] Test a script against multiple interpreters: `bash`, `dash`, and `busybox sh`; document which features you depend on and why.
+
+### 7.7 Testing with BATS
+
+- [ ] Install `bats-core` (`git clone https://github.com/bats-core/bats-core.git` or via package manager); run `bats --version` to confirm it is installed.
+- [ ] Write a `test_utils.bats` file with three `@test` blocks: one that checks a function returns `0` on valid input, one that checks it returns `1` on invalid input, and one that checks its stdout output.
+- [ ] Use `run command` inside a BATS test to capture exit code (`$status`) and output (`$output`) separately; use `[ "$status" -eq 0 ]` and `[[ "$output" == *expected* ]]` assertions.
+- [ ] Use `setup()` and `teardown()` functions to create and remove temporary files before and after each test.
+- [ ] Use `setup_file()` and `teardown_file()` to run setup once for the entire test file rather than per test.
+- [ ] Write a test that mocks an external command: create a fake `curl` function that returns a controlled exit code and output; unset it in `teardown`.
+- [ ] Run a test suite with `bats tests/`; interpret the TAP output (ok / not ok lines); use `--tap` and `--junit` flags to produce machine-readable output for CI.
+- [ ] Add a BATS test run to the Git `pre-push` hook: `bats tests/ || exit 1`; explain why running tests before push catches regressions early.
 
 ---
 
