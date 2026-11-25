@@ -83,7 +83,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Pipe the output of one command into another using `|`; build a pipeline of three or more commands.
 - [ ] Use `tee` to write pipeline output to a file and to stdout simultaneously.
 - [ ] Use process substitution `<(command)` to use the output of a command as a file argument: `diff <(sort file1) <(sort file2)`.
-- [ ] Open a file descriptor with `exec 3> output.txt`; write to it with `echo "line" >&3`; close it with `exec 3>&-`.
+- [ ] Explain what a file descriptor is; demonstrate redirecting stdout, stderr, and both simultaneously using `>`, `2>`, and `&>` in a short script.
 - [ ] Use `exec` to redirect all stdout of a script to a log file: `exec > logfile.txt 2>&1` at the top of the script.
 - [ ] Explain the difference between `|` (pipe) and `<(...)` (process substitution); state when each is required.
 
@@ -231,11 +231,11 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Use `journalctl -b` to view logs since last boot; use `journalctl --disk-usage` to check log disk usage.
 - [ ] Use `crontab -e` to edit cron jobs; write a cron expression for: every minute, every day at midnight, every Monday at 8 AM, and the 1st of every month.
 - [ ] Explain the crontab field order: `minute hour day-of-month month day-of-week command`; use `crontab -l` to list current jobs and `crontab -r` to remove all.
-- [ ] Use `env` to print all environment variables; use `env -i command` to run a command with a clean empty environment.
-- [ ] Use `export VAR=value` to set an environment variable for child processes; use `unset VAR` to remove it.
 - [ ] Use `history` to view command history; use `!N` to re-run command N; use `!!` for the last command; use `Ctrl+R` for reverse search.
 - [ ] Use `sudo command` to run as root; use `sudo -u user command` to run as a specific user; use `sudo -l` to list allowed commands; explain why `sudo su -` is different from `sudo -i`.
 - [ ] Use `service service_name status` for SysV-style service management; explain when `service` and `systemctl` coexist on the same system.
+
+- [ ] Use `tmux new -s mysession` to create a named session; use `tmux attach -t mysession` to reconnect; use `Ctrl+B D` to detach; use `tmux ls` to list sessions; explain why `tmux` is essential for persistent remote sessions.
 
 ### 2.5 Data Processing
 
@@ -252,6 +252,40 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 
 ---
 
+---
+
+## 🟢 Phase 2 — Beginner Scripts
+
+### 🟢 Phase 2 — Beginner Scripts
+
+#### Script: Host Enumeration
+- [ ] Write a script that accepts a CIDR range (e.g., `192.168.1.0/24`) and uses `ping -c 1 -W 1` on each IP; print live hosts to `live_hosts.txt` and dead hosts to `dead_hosts.txt`.
+- [ ] Run each ping in the background with `&` and collect all PIDs in an array; use `wait` after all pings to synchronize results.
+- [ ] Add a progress counter that prints `Checked N/254 hosts` using `\r` to overwrite the same line.
+- [ ] Parse `/proc/net/arp` to also display the MAC address for each live host.
+- [ ] Accept an optional `--timeout` argument and pass its value to `ping -W`.
+
+#### Script: Network Reconnaissance Wrapper (Nmap)
+- [ ] Write a wrapper that accepts a target and a profile (`quick`, `full`, `stealth`) and runs the appropriate `nmap` flags for each profile.
+- [ ] Save results in both XML (`-oX`) and grepable (`-oG`) formats to a timestamped output directory.
+- [ ] Parse the grepable output with `grep` and `awk` to produce a clean `host:port:service` CSV.
+- [ ] Run `nmap --script vuln` on the target and pipe the output through the report formatter to produce a vulnerability summary CSV.
+- [ ] Add a check that the script only runs if `nmap` is installed; if not, print an install hint and exit.
+
+#### Script: Subdomain Enumeration
+- [ ] Write a script that accepts a domain and a wordlist file; for each word, run `dig +short ${word}.${domain} A`; record lines that return an IP.
+- [ ] Skip entries where `dig` returns a CNAME pointing to a third-party domain.
+- [ ] Run lookups in parallel by spawning background jobs with `&` and limit to N concurrent jobs using a semaphore counter.
+- [ ] Save resolved subdomains and their IPs to a CSV: `subdomain,ip`.
+- [ ] Add a `--delay` flag to add a sleep between lookups to avoid rate-limiting.
+
+#### Script: Batch URL Checker
+- [ ] Write a script that reads a list of URLs from a file (one per line) and checks each with `curl -s -o /dev/null -w "%{http_code}"`.
+- [ ] Output a CSV: `url,status_code` — one line per URL.
+- [ ] Add a `--timeout` argument to pass to `curl --max-time`.
+- [ ] Classify responses: `2xx` = OK, `3xx` = Redirect, `4xx` = Client Error, `5xx` = Server Error, `000` = Unreachable.
+- [ ] Accept a `--filter STATUS` argument to print only lines matching a given class (e.g., `--filter 4xx`).
+
 ## 3. Mini Projects (Fundamentals)
 
 - [ ] Build a menu-driven script that presents numbered options (Add, Delete, List, Quit) using a `while` loop and a `case` statement; validate all user input.
@@ -261,7 +295,6 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Build a system info reporter: collect hostname, OS version, uptime, CPU count, total/free RAM, and disk usage; format the output as a readable report and save to a file.
 - [ ] Build a simple config file parser: read a `KEY=VALUE` file, skip comment lines starting with `#`, and export each variable; validate that required keys are present.
 - [ ] Build a script that monitors a directory for new files using an infinite loop with `sleep 5`; when a new `.csv` file appears, count its lines and append a summary to a report file.
-- [ ] Build a batch URL checker: read URLs from a file one per line; use `curl -s -o /dev/null -w "%{http_code}"` on each; output a CSV of URL and status code.
 
 ---
 
@@ -323,58 +356,80 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 
 ---
 
-## 5. Automation Projects
-
-- [ ] Build a **host enumeration script**: accept a CIDR range or list of IPs; `ping -c 1` each host; report live and dead hosts to separate files; run checks in parallel with `&` and `wait`.
-- [ ] Build a **network reconnaissance script**: accept a target IP; use `nc -z` to scan a configurable port range; log open ports with timestamps; limit to authorized targets only.
-- [ ] Build a **subdomain enumeration script**: accept a domain and a wordlist file; use `dig +short ${sub}.${domain}` for each word; record subdomains that resolve to an IP; skip CNAMEs pointing off-domain.
-- [ ] Build a **log analysis script**: accept a log file path and a date filter; extract lines matching the date; count occurrences by HTTP status code; report the top 10 most requested URLs using `awk` and `sort`.
-- [ ] Build a **file processing pipeline**: watch a drop directory for new `.csv` files; for each file, validate column count, deduplicate rows with `sort -u`, count records, and move processed files to an archive folder.
-- [ ] Build a **backup automation script**: back up specified directories to a remote host using `rsync` over SSH; keep a rolling 7-day retention by deleting archives older than 7 days; email a summary using `mail` or `sendmail`.
-- [ ] Build a **system monitoring script**: check CPU load (from `/proc/loadavg`), free memory (from `free -m`), disk usage (from `df -h`), and top 5 CPU-consuming processes (from `ps aux`); alert via `logger` when thresholds are exceeded.
-- [ ] Build a **cron-driven report generator**: run daily at 6 AM; collect yesterday's log stats (error count, warning count, unique IPs); write an HTML report to `/var/www/html/report.html`.
-- [ ] Build an **SSH automation script**: read a list of hosts from a file; run a command on each via `ssh -o BatchMode=yes -o ConnectTimeout=5`; collect stdout and exit codes; skip unreachable hosts gracefully.
-- [ ] Build a **service monitor**: loop every 60 seconds; check that a list of services (`nginx`, `postgresql`, `redis`) are active using `systemctl is-active`; restart any failed service and log the event.
-- [ ] Build a **package update automation script**: run `apt update`; collect the list of upgradable packages; log them; apply upgrades only if fewer than 20 packages are pending (to avoid large unreviewed updates); send results to a log file.
-- [ ] Build an **IOC extractor**: read a directory of text files; extract and deduplicate IPv4 addresses, domain names, MD5/SHA256 hashes, and URLs using `grep -oE` with appropriate patterns; output each category to a separate file.
-- [ ] Build a **firewall management script**: wrap `ufw` (or `iptables`) to accept arguments (`--allow port`, `--deny port`, `--status`, `--reset`); validate port numbers; log every rule change with a timestamp; require `--confirm` for destructive operations; run only on authorized systems you control.
-- [ ] Build a **batch vulnerability scanner**: accept a list of `host:port` pairs and a list of `nmap` scripts to run; run each scan sequentially or in parallel with a configurable concurrency limit; parse output to extract CVE identifiers; produce a deduplicated CSV report of `host,port,cve`.
-
 ---
 
-## 6. Security & Pentesting Automation
+## 🟡 Phase 3 — Intermediate Scripts
+
+### 🟡 Phase 3 — Intermediate Scripts
+
+#### Script: Log Analyzer
+- [ ] Write a script that accepts a log file and a date string (`YYYY-MM-DD`); extract only lines from that date using `grep`.
+- [ ] Count HTTP status codes using `awk '{print $9}' | sort | uniq -c | sort -rn` and print a summary table.
+- [ ] Print the top 10 most requested URLs using `awk '{print $7}' | sort | uniq -c | sort -rn | head -10`.
+- [ ] Print the top 10 source IPs using `awk '{print $1}' | sort | uniq -c | sort -rn | head -10`.
+- [ ] Accept a `--output` flag to save the report to a file instead of printing to stdout.
+
+#### Script: IOC Extractor
+- [ ] Write a script that reads all `.txt` and `.log` files in a directory and extracts: IPv4 addresses, domain names (basic regex), MD5 hashes (32 hex chars), SHA256 hashes (64 hex chars), and URLs.
+- [ ] Deduplicate each category with `sort -u` and write each to a separate output file (`ips.txt`, `domains.txt`, `hashes.txt`, `urls.txt`).
+- [ ] Use `grep -oE` with appropriate extended-regex patterns for each IOC type.
+- [ ] Add a summary at the end: print counts for each IOC category.
+- [ ] Accept a `--format json` flag to output all IOCs as a JSON object (use `jq` or manual construction).
+
+#### Script: File Processing & Backup Automation
+- [ ] Write a backup script that accepts a source directory and a remote `user@host:/path`; use `rsync -avz --delete -e ssh` to sync.
+- [ ] Create a timestamped `.tar.gz` archive of the source directory before syncing; store it locally.
+- [ ] Delete local archives older than 7 days using `find . -name "*.tar.gz" -mtime +7 -delete`.
+- [ ] Log the archive size, sync duration, and exit code to `backup.log` with a timestamp prefix.
+- [ ] Add a `--dry-run` mode that prints what would be archived/deleted without doing it.
+
+#### Script: System Monitoring
+- [ ] Write a monitoring script that checks CPU load (`awk '{print $1}' /proc/loadavg`), free memory (`free -m | awk 'NR==2{print $4}'`), and disk usage (`df -h / | awk 'NR==2{print $5}'`).
+- [ ] Alert (via `logger`) when CPU load exceeds 2.0, free memory drops below 500 MB, or disk usage exceeds 85%.
+- [ ] Print the top 5 CPU-consuming processes using `ps aux --sort=-%cpu | head -6 | tail -5`.
+- [ ] Run the checks in a loop every 60 seconds using `sleep 60`; run as a cron job or background daemon.
+- [ ] Write a `--once` flag to run all checks a single time and exit (useful for testing).
+
+#### Script: SSH Automation
+- [ ] Write a script that reads a list of `user@host` entries from a file and runs a given command on each with `ssh -o BatchMode=yes -o ConnectTimeout=5`.
+- [ ] Collect stdout, stderr, and exit code for each host; write a summary: `host, exit_code, output_snippet`.
+- [ ] Skip unreachable hosts gracefully (non-zero exit code from ssh) and log them separately.
+- [ ] Add a `--parallel` flag to run all SSH sessions concurrently with `&` and `wait`.
+- [ ] Add a `--copy-file` mode that uses `scp` to copy a local file to all hosts.
+
+## 5. Security & Pentesting Automation
 
 > ⚠️ All exercises in this section must be performed **only** against systems, networks, and applications you own or have explicit written authorization to test. Never run these scripts against production systems or third-party infrastructure without permission.
 
-### 6.1 Network Scanning Automation
+### 5.1 Network Scanning Automation
 
 - [ ] Write a Bash wrapper around `nmap` that accepts a target, output directory, and scan profile (`quick`, `full`, `stealth`); save results in both XML (`-oX`) and grepable (`-oG`) formats.
 - [ ] Parse `nmap -oG` output with `grep` and `awk` to extract open ports and service names; output a clean `host:port:service` CSV.
 - [ ] Write a script that runs `nmap --script vuln` against a target and extracts CVE identifiers from the output using `grep -oP 'CVE-[0-9\-]+'`.
 - [ ] Write a port scanner using only `bash` and `nc -z`: loop over an IP list and port list; log `OPEN` results with timestamps; run checks in parallel.
 
-### 6.2 HTTP Requests and Web Enumeration
+### 5.2 HTTP Requests and Web Enumeration
 
 - [ ] Write a `curl`-based HTTP header inspector: fetch response headers with `curl -sI URL`; extract and display `Server`, `X-Powered-By`, `Content-Security-Policy`, `Strict-Transport-Security`, and `X-Frame-Options`.
 - [ ] Write a directory brute-forcing script: read a wordlist; `curl -s -o /dev/null -w "%{http_code}" base_url/$word` for each word; record all non-404 responses with their status codes and content lengths.
 - [ ] Write a script that tests for open redirects: append `?redirect=https://evil.com` to a list of URLs; use `curl -sI -L` to follow redirects; flag any response that ends at a different domain.
 - [ ] Write a virtual host brute-forcer: send `curl -sI -H "Host: $vhost" target_ip` for each entry in a hostname wordlist; record responses with non-standard status codes or different `Content-Length` values.
 
-### 6.3 DNS Enumeration
+### 5.3 DNS Enumeration
 
 - [ ] Write a DNS zone-transfer attempt script: use `dig axfr @nameserver domain`; check the exit code; if successful, parse and save all records.
 - [ ] Write a DNS brute-force script using a wordlist: query `${word}.${domain}` using `dig +short` for each word; record resolved entries; skip non-resolving entries silently.
 - [ ] Write a reverse DNS sweep script: accept a CIDR block; iterate over all IPs; run `dig -x IP +short` on each; log hostnames that resolve.
 - [ ] Write a script that collects all DNS record types for a domain (`A`, `AAAA`, `MX`, `NS`, `TXT`, `SOA`, `CNAME`) using `dig` in a loop; output a structured report.
 
-### 6.4 SSL/TLS Certificate Inspection
+### 5.4 SSL/TLS Certificate Inspection
 
 - [ ] Use `echo | openssl s_client -connect host:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates` to extract certificate details.
 - [ ] Write a script that checks whether a domain's TLS certificate expires within 30 days: parse `notAfter` from `openssl x509`; compare with `date +%s`; alert if expiry is imminent.
 - [ ] Write a batch certificate checker: read a list of `host:port` pairs from a file; check the certificate expiry for each; output a CSV of domain, expiry date, and days remaining.
 - [ ] Use `openssl s_client -connect host:443 < /dev/null 2>&1 | grep -E "Protocol|Cipher"` to check the TLS protocol version and cipher suite.
 
-### 6.5 Log Parsing and Privilege Enumeration
+### 5.5 Log Parsing and Privilege Enumeration
 
 - [ ] Write a script that parses `/var/log/auth.log` to extract: failed login attempts, successful logins, source IPs, and usernames; output summary counts per IP.
 - [ ] Write a Linux privilege enumeration script (for authorized systems): collect SUID/SGID files (`find / -perm /4000 -o -perm /2000`), world-writable directories, cron jobs (`crontab -l`, `/etc/cron*`), and sudo rules (`sudo -l`); output a formatted report.
@@ -383,16 +438,43 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 
 ---
 
-## 7. Debugging & Best Practices
+---
 
-### 7.1 ShellCheck and Static Analysis
+## 🔴 Phase 4 — Advanced Scripts
+
+### 🔴 Phase 4 — Advanced Scripts
+
+#### Script: Report Generator
+- [ ] Build a cron-driven report script: run daily at 6 AM; collect yesterday's log stats (error count, warning count, unique IPs from `/var/log/auth.log`).
+- [ ] Write an HTML report to `/var/www/html/report.html` using `cat <<EOF ... EOF` heredoc blocks.
+- [ ] Add a plain-text version of the report saved to `/var/log/daily_report.txt`.
+- [ ] Email the report using `mail -s "Daily Report" admin@example.com < /var/log/daily_report.txt`.
+- [ ] Add a `--format` argument accepting `html`, `txt`, or `csv`.
+
+#### Script: Batch Vulnerability Scanner
+- [ ] Accept a list of `host:port` pairs and a list of `nmap` scripts; run each scan sequentially or in parallel with configurable concurrency.
+- [ ] Parse nmap output to extract CVE identifiers with `grep -oP 'CVE-[0-9\-]+'`; deduplicate with `sort -u`.
+- [ ] Produce a CSV report: `host,port,cve`.
+- [ ] Add a `--max-jobs N` flag to limit parallel scans.
+- [ ] Log scan start/end times and duration for each target.
+
+#### Script: Firewall Management Script
+- [ ] Wrap `ufw` to accept `--allow port`, `--deny port`, `--status`, and `--reset` arguments.
+- [ ] Validate that port arguments are integers between 1 and 65535; reject anything outside that range.
+- [ ] Log every rule change with a timestamp to `/var/log/firewall_changes.log`.
+- [ ] Require a `--confirm` flag for `--reset` to prevent accidental firewall wipes.
+- [ ] Check that the script is run as root; exit with an error if not.
+
+## 6. Debugging & Best Practices
+
+### 6.1 ShellCheck and Static Analysis
 
 - [ ] Install `shellcheck` and run it on a script you wrote; fix every warning; explain the reason behind each fix.
 - [ ] Enable `shellcheck` in your editor (VSCode extension or vim ALE) so you get real-time feedback while writing.
 - [ ] Run `shellcheck -e SC2086` to suppress a specific warning and understand when suppression is justified vs when you should fix the code.
 - [ ] Write a script intentionally containing five common ShellCheck-detected bugs (unquoted variable, `[ ]` instead of `[[ ]]`, `cd` without error check, `for f in $(ls)`, missing shebang); fix each one after `shellcheck` reports it.
 
-### 7.2 Bash Debugging Techniques
+### 6.2 Bash Debugging Techniques
 
 - [ ] Add `set -x` at the top of a script to trace every command before execution; remove it by adding `set +x` before a sensitive section.
 - [ ] Add `set -e` to exit immediately on error; demonstrate that a failed command in a pipeline is NOT caught without `set -o pipefail`; add `set -o pipefail` and show the difference.
@@ -403,7 +485,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Add `PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'` before `set -x` to include file name, line number, and function name in trace output.
 - [ ] Use `trap 'echo "Error at line $LINENO, exit $?"' ERR` to print the line number whenever the script hits an error.
 
-### 7.3 Error Handling and Logging
+### 6.3 Error Handling and Logging
 
 - [ ] Write a `die()` function that prints a message to `stderr` and exits with a given code: `die() { echo "[ERROR] $*" >&2; exit 1; }`.
 - [ ] Write a `log()` function with severity levels (INFO, WARN, ERROR) that prefixes each line with a timestamp and the level name.
@@ -412,7 +494,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Write a script that creates a temporary directory with `TMPDIR=$(mktemp -d)` and registers `rm -rf "$TMPDIR"` with `trap ... EXIT` to ensure cleanup.
 - [ ] Use `flock` to ensure only one instance of a script runs at a time: `exec 9>/var/lock/myscript.lock; flock -n 9 || die "Already running"`.
 
-### 7.4 Modular Script Design
+### 6.4 Modular Script Design
 
 - [ ] Split a large script into `main.sh`, `lib/utils.sh`, `lib/network.sh`, and `lib/logging.sh`; source the libraries at the top of `main.sh`.
 - [ ] Write a `usage()` function that prints a help message and is called when `--help` is passed or arguments are invalid.
@@ -421,7 +503,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Add a `--dry-run` mode to every script that performs destructive or network actions; in dry-run mode, print what the script would do without doing it.
 - [ ] Use `readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"` to find the script's own directory portably.
 
-### 7.5 Git for Script Version Control
+### 6.5 Git for Script Version Control
 
 - [ ] Initialize a Git repository for your scripts; write a `.gitignore` that excludes `.env`, `*.log`, `*.key`, `*.pem`, and `secrets/`.
 - [ ] Use `git-secrets` or `trufflehog` to scan a repository for committed credentials; remediate any findings with `git filter-repo`.
@@ -429,7 +511,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Use `git log --oneline --all` to review history; use `git diff HEAD~1` to see what changed in the last commit.
 - [ ] Write a commit message convention for scripts: `fix:`, `feat:`, `chore:`, `sec:` — explain why descriptive messages matter for script maintenance.
 
-### 7.6 Portable Shell Scripting
+### 6.6 Portable Shell Scripting
 
 - [ ] Change the shebang to `#!/bin/sh` and run the script with `dash script.sh`; fix every bashism that `dash` rejects: `[[`, `((...))`, `local`, `declare`, arrays, `&>`, `source` (use `.` instead).
 - [ ] Use `shellcheck --shell=sh script.sh` to lint for POSIX compliance; understand why SC2039 (bash-specific feature used in sh script) is raised.
@@ -440,7 +522,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 - [ ] Explain when portability matters (scripts that must run on Alpine Linux with `busybox sh`, macOS `/bin/sh`, or minimal container images) and when it is fine to require Bash explicitly.
 - [ ] Test a script against multiple interpreters: `bash`, `dash`, and `busybox sh`; document which features you depend on and why.
 
-### 7.7 Testing with BATS
+### 6.7 Testing with BATS
 
 - [ ] Install `bats-core` (`git clone https://github.com/bats-core/bats-core.git` or via package manager); run `bats --version` to confirm it is installed.
 - [ ] Write a `test_utils.bats` file with three `@test` blocks: one that checks a function returns `0` on valid input, one that checks it returns `1` on invalid input, and one that checks its stdout output.
@@ -453,7 +535,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 
 ---
 
-## 8. Secure Scripting Practices
+## 7. Secure Scripting Practices
 
 - [ ] Never store passwords, API keys, or tokens as plaintext variables in a script; read them from environment variables or a `~/.config/tool/credentials` file with permissions `600`.
 - [ ] Validate all external input (user arguments, file contents, API responses) before using it in a command; reject input that does not match an expected pattern.
@@ -468,7 +550,7 @@ Use this as a learning checklist. Solve each question yourself, test edge cases,
 
 ---
 
-## 9. Learning Outcome
+## 8. Learning Outcome
 
 - [ ] Write a complete, professional Bash script from scratch — shebang, `set -euo pipefail`, argument parsing, logging, error handling, cleanup trap — without referencing templates.
 - [ ] Use `grep`, `awk`, `sed`, `cut`, `sort`, `uniq`, `xargs`, and `jq` fluently in pipelines to process real log files, CSV data, and JSON API responses.
